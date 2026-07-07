@@ -2,38 +2,52 @@ import { useState, useEffect } from 'react';
 import './App.css';
 
 function App() {
-  // State to hold the raw data fetched from Kitsu
   const [animeList, setAnimeList] = useState([]);
-  
-  // State for user inputs
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  
+  // NEW: State to track our pagination offset
+  const [offset, setOffset] = useState(0);
 
-  // 1. Fetching Data with useEffect
+  // NEW: We moved the fetch logic outside of useEffect so we can call it on demand
+  const fetchAnimeData = async (currentOffset) => {
+    try {
+      const response = await fetch(`https://kitsu.io/api/edge/anime?page[limit]=20&page[offset]=${currentOffset}`);
+      const json = await response.json();
+      
+      setAnimeList((prevList) => {
+        // 1. Create a Set of existing IDs for quick lookups
+        const existingIds = new Set(prevList.map(anime => anime.id));
+        
+        // 2. Filter the incoming data to only include unique items
+        const newAnimes = json.data.filter(anime => !existingIds.has(anime.id));
+        
+        // 3. Combine the previous list with the filtered unique items
+        return [...prevList, ...newAnimes];
+      });
+    } catch (error) {
+      console.error("Error fetching anime data:", error);
+    }
+  };
+
+  // 1. Initial Load
   useEffect(() => {
-    const fetchAnimeData = async () => {
-      try {
-        // Fetching 20 items to ensure we have at least 10 unique items to display
-        const response = await fetch('https://kitsu.io/api/edge/anime?page[limit]=20');
-        const json = await response.json();
-        setAnimeList(json.data);
-      } catch (error) {
-        console.error("Error fetching anime data:", error);
-      }
-    };
+    fetchAnimeData(0); // Fetch the first 20 items when the page loads
+  }, []);
 
-    fetchAnimeData();
-  }, []); // Empty dependency array means this runs ONCE when the component mounts
+  // NEW: Function to handle the Load More button click
+  const handleLoadMore = () => {
+    const newOffset = offset + 20;
+    setOffset(newOffset); // Update state to remember where we are
+    fetchAnimeData(newOffset); // Fetch the next batch using the new offset
+  };
 
-  // 2. Filtering Data (.filter())
-  // We chain filters: first by search string, then by dropdown category
+  // 2. Filtering Data
   const filteredAnimes = animeList.filter((anime) => {
-    const title = anime.attributes.canonicalTitle.toLowerCase();
+    const title = anime.attributes.canonicalTitle?.toLowerCase() || "";
     const status = anime.attributes.status;
     
-    // Check if title matches search
     const matchesSearch = title.includes(searchInput.toLowerCase());
-    // Check if status matches dropdown (or if dropdown is empty/All)
     const matchesStatus = statusFilter === "" || status === statusFilter;
 
     return matchesSearch && matchesStatus;
@@ -42,13 +56,11 @@ function App() {
   // 3. Calculating Summary Statistics
   const totalAnime = filteredAnimes.length;
   
-  // Calculate average rating of currently displayed anime
   const averageRating = filteredAnimes.reduce((acc, anime) => {
     const rating = parseFloat(anime.attributes.averageRating) || 0;
     return acc + rating;
   }, 0) / (totalAnime || 1); 
 
-  // Calculate total episodes of currently displayed anime
   const totalEpisodes = filteredAnimes.reduce((acc, anime) => {
     return acc + (anime.attributes.episodeCount || 0);
   }, 0);
@@ -62,7 +74,7 @@ function App() {
       {/* Summary Statistics Section */}
       <div className="stats-container">
         <div className="stat-card">
-          <h3>Total Shows</h3>
+          <h3>Total Shows Displayed</h3>
           <p>{totalAnime}</p>
         </div>
         <div className="stat-card">
@@ -96,7 +108,7 @@ function App() {
         </select>
       </div>
 
-      {/* Rendering the List (.map()) */}
+      {/* Rendering the List */}
       <div className="anime-grid">
         {filteredAnimes.length > 0 ? (
           filteredAnimes.map((anime) => (
@@ -115,6 +127,16 @@ function App() {
           <p>No anime found matching your criteria!</p>
         )}
       </div>
+
+      {/* NEW: Load More Button */}
+      {/* We only show this button if there is NO search query, because searching Kitsu's entire database requires a different API setup */}
+      {searchInput === "" && (
+        <div className="load-more-container">
+          <button className="load-more-btn" onClick={handleLoadMore}>
+            Load More Anime
+          </button>
+        </div>
+      )}
     </div>
   );
 }

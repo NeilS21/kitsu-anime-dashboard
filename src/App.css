@@ -54,3 +54,23 @@
   width: 100%;
   border-radius: 4px;
 }
+
+.load-more-container {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.load-more-btn {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  background-color: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.load-more-btn:hover {
+  background-color: #1a252f;
+}
